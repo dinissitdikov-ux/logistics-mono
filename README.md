@@ -201,7 +201,7 @@ The following environment variables are available:
 - `PORT` - Server port (default: 5000)
 - `JWT_SECRET` - Secret key for JWT tokens
 - `NODE_ENV` - Environment (development/production)
-
+  
 ## License
 
 ISC
