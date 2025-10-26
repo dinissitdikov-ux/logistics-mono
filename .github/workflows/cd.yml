@@ -1,10 +1,9 @@
-# Norsk: CD-workflow med migrasjoner før container-build
 name: CD
 
 on:
   push:
     tags:
-      - 'v*'   # Norsk: kjør kun på versjonstags
+      - 'v*'
 
 permissions:
   contents: read
@@ -13,26 +12,37 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: logistics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d logistics"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
       - uses: actions/checkout@v4
 
-      # Norsk: Node-miljø for å kjøre migrasjoner
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # Norsk: Installer avhengigheter
       - name: Install deps
         run: npm ci
 
-      # Norsk: Kjør DB-migrasjoner før build
       - name: Run DB migrations
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}  # Norsk: sett i repo-secrets
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/logistics
         run: node database/setup.js
 
-      # Norsk: Bygg og push Docker-image
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
