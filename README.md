@@ -1,5 +1,10 @@
 # Logistics Backend System
 
+## Installation
+
+```bash
+docker pull ghcr.io/dinissitdikov-ux/logistics-mono:v0.0.4
+
 A comprehensive monolithic backend API for logistics and supply chain management, built with Node.js, Express, and PostgreSQL.
 
 ## Features
