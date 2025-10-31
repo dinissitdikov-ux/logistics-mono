@@ -1,6 +1,6 @@
 {
   "name": "logistics-backend",
-  "version": "1.0.0",
+  "version": "0.0.6",
   "description": "Monolithic backend for logistics system",
   "main": "server.js",
   "scripts": {
