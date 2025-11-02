@@ -1,31 +1,24 @@
 {
-  "name": "logistics-backend",
+  "name": "logistics-mono",
   "version": "1.0.0",
-  "description": "Monolithic backend for logistics system",
+  "private": true,
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "db:setup": "node database/setup.js",
-    "build": "node -e \"console.log('build: noop')\"",
-    "lint": "node -e \"console.log('lint: ok')\"",
-    "test": "node -e \"console.log('test: ok')\""
+    "dev": "node server.js"
   },
-  "keywords": [
-    "logistics",
-    "backend",
-    "api"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "express-validator": "^7.3.0",
-    "helmet": "^8.0.1",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3"
+    "pg": "^8.11.3",
+    "winston": "^3.13.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -1,13 +1,22 @@
-const express = require('express');
+const express = require("express");
+const { authenticateToken, authorizeRoles } = require("../middleware/auth");
+
 const router = express.Router();
-const customersController = require('../controllers/customersController');
-const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
 router.use(authenticateToken);
 
-router.get('/', customersController.getAllCustomers);
-router.get('/:id', customersController.getCustomerById);
-router.post('/', authorizeRoles('admin', 'dispatcher'), customersController.createCustomer);
-router.patch('/:id', authorizeRoles('admin', 'dispatcher'), customersController.updateCustomer);
+// GET /api/customers
+router.get("/", async (req, res) => {
+  return res.json({
+    customers: [{ id: 1, name: "Tech Solutions Inc" }],
+    count: 1,
+  });
+});
+
+// POST /api/customers (пример, защищено ролями)
+router.post("/", authorizeRoles("admin", "dispatcher"), async (req, res) => {
+  const c = req.body || {};
+  return res.status(201).json({ created: c });
+});
 
 module.exports = router;

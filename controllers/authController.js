@@ -1,69 +1,100 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
-const { JWT_SECRET } = require('../middleware/auth');
+// controllers/authController.js
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const db = require("../config/database");
+const { JWT_SECRET } = require("../middleware/auth");
+
+const normEmail = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
 
 exports.register = async (req, res) => {
   try {
-    const { email, password, full_name, role } = req.body;
+    const email = normEmail(req.body.email);
+    const password = String(req.body.password || "");
+    const full_name = String(req.body.full_name || "").trim();
+    const role = req.body.role ? String(req.body.role) : "driver";
 
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ error: 'Email already registered' });
+    if (!email || !password) {
+      return res.status(400).json({ error: "email_and_password_required" });
     }
 
-    const password_hash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO users (email, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, full_name, role, created_at',
-      [email, password_hash, full_name, role || 'driver']
+    const dup = await db.query("select id from users where email=$1", [email]);
+    if (dup.rows.length) {
+      return res.status(409).json({ error: "email_already_registered" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
+
+    const ins = await db.query(
+      `insert into users (email, password_hash, full_name, role)
+       values ($1,$2,$3,$4)
+       returning id, email, full_name, role, created_at`,
+      [email, password_hash, full_name, role],
     );
 
-    const token = jwt.sign({ userId: result.rows[0].id }, JWT_SECRET, { expiresIn: '7d' });
+    const user = ins.rows[0];
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" },
+    );
 
-    res.status(201).json({
-      message: 'User registered successfully',
-      user: result.rows[0],
-      token
+    return res.status(201).json({
+      message: "registered",
+      user,
+      token,
     });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({ error: "registration_failed", detail: e.message });
   }
 };
 
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = normEmail(req.body.email);
+    const password = String(req.body.password || "");
 
-    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    if (!email || !password) {
+      return res.status(400).json({ error: "email_and_password_required" });
     }
 
-    const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+    const q = await db.query("select * from users where email=$1", [email]);
+    if (!q.rows.length) {
+      return res.status(401).json({ error: "invalid_credentials" });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const user = q.rows[0];
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) {
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
 
-    res.json({
-      message: 'Login successful',
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" },
+    );
+
+    return res.json({
+      message: "login_ok",
       user: {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: user.role
+        role: user.role,
       },
-      token
+      token,
     });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+  } catch (e) {
+    return res.status(500).json({ error: "login_failed", detail: e.message });
   }
 };
 
 exports.getProfile = async (req, res) => {
-  res.json({ user: req.user });
+  return res.json({ user: req.user || null });
 };
