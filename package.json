@@ -1,6 +1,6 @@
 {
   "name": "logistics-mono",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "main": "server.js",
   "scripts": {
