@@ -1,5 +1,11 @@
 # Logistics Backend System
 
+## Public URL
+https://logistics-mono.onrender.com
+
+## Healthcheck
+GET https://logistics-mono.onrender.com/api/health
+
 ## Installation
 
 ```bash
