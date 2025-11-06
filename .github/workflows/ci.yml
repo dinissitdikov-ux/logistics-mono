@@ -1,51 +1,40 @@
 name: CI
-
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
+push:
+branches: [ "main" ]
+pull_request:
+branches: [ "main" ]
 jobs:
-  node-ci:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: logistics
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d logistics"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install deps
-        run: npm ci
-
-      - name: Run DB migrations
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/logistics
-        run: node database/setup.js
-
-      - name: Build
-        run: npm run build --if-present
-
-      - name: Lint
-        run: npm run lint --if-present
-
-      - name: Test
-        run: npm test --if-present
+node-ci:
+runs-on: ubuntu-latest
+services:
+postgres:
+image: postgres:16
+env:
+POSTGRES_USER: postgres
+POSTGRES_PASSWORD: postgres
+POSTGRES_DB: logistics
+ports:
+- 5432:5432
+options: >-
+--health-cmd="pg_isready -U postgres -d logistics"
+--health-interval=5s
+--health-timeout=5s
+--health-retries=20
+steps:
+- uses: actions/checkout@v4
+- uses: actions/setup-node@v4
+with:
+node-version: "20"
+- name: Install deps
+run: npm install --omit=dev
+- name: Run DB migrations
+env:
+DATABASE_URL: postgres://postgres:postgres@localhost:5432/logistics
+run: node database/setup.js
+- name: Build
+run: npm run build --if-present
+- name: Lint
+run: npm run lint --if-present
+- name: Test
+run: npm test --if-present
