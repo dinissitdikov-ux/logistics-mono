@@ -1,11 +1,15 @@
+// app.js
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 
 const app = express();
 
-/* Helmet + CSP: разрешаем исходящие fetch из браузера к нашему Render
-   и (при необходимости) к Replit API-домену. */
+/**
+ * Helmet + CSP
+ * CSP влияет только на ответы с ЭТОГО домена (Render).
+ * Разрешаем подключение только к самому API-домену.
+ */
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -14,22 +18,26 @@ app.use(
         "default-src": ["'self'"],
         "connect-src": [
           "'self'",
-          "https://logistics-mono-1.onrender.com",
-          "https://logisticsmono-api.replit.app"
+          "https://logistics-mono-1.onrender.com"
         ],
         "script-src": ["'self'", "'unsafe-inline'", "https:"],
         "style-src": ["'self'", "'unsafe-inline'", "https:"],
         "img-src": ["'self'", "data:", "https:"],
         "font-src": ["'self'", "https:"]
       }
-    }
+    },
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    referrerPolicy: { policy: "no-referrer" }
   })
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* Явный allowlist для CORS. */
+/**
+ * CORS: разрешённые фронтенд-ориджины
+ */
 const allowlist = [
   "https://svalbard-360.com",
   "https://logisticsmono-api.replit.app",
@@ -38,8 +46,9 @@ const allowlist = [
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // прямые запросы (сервер ↔ сервер)
+    origin(origin, callback) {
+      // прямой запрос без Origin (curl/сервер) — разрешаем
+      if (!origin) return callback(null, true);
       if (allowlist.includes(origin)) return callback(null, true);
       return callback(new Error("Blocked by CORS"));
     },
@@ -52,19 +61,18 @@ app.use(
       "Accept"
     ],
     credentials: true,
-    preflightContinue: false,
     optionsSuccessStatus: 200
   })
 );
-
-/* Ответ на preflight для любых путей. */
+// preflight на любые пути
 app.options("*", cors());
 
-/* Главный индекс: удобный список доступных эндпоинтов. */
+/**
+ * Служебные эндпоинты
+ */
 app.get("/", (req, res) => {
   res.status(200).json({
-    service: "logistics-mono",
-    base: "/api",
+    base: "https://logistics-mono-1.onrender.com",
     endpoints: [
       "GET  /health",
       "GET  /api/health",
@@ -72,7 +80,6 @@ app.get("/", (req, res) => {
       "POST /api/auth/login",
       "GET  /api/auth/profile",
       "GET  /api/orders",
-      "GET  /api/index",
       "GET  /api/vehicles",
       "GET  /api/warehouses",
       "GET  /api/products",
@@ -85,15 +92,17 @@ app.get("/", (req, res) => {
   });
 });
 
-/* Health. */
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "healthy", ts: new Date().toISOString() });
 });
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
 
-/* Роуты API. */
+/**
+ * Бизнес-маршруты
+ */
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/orders", require("./routes/orders"));
 app.use("/api/deliveries", require("./routes/deliveries"));
@@ -104,12 +113,13 @@ app.use("/api/products", require("./routes/products"));
 app.use("/api/customers", require("./routes/customers"));
 app.use("/api/agents", require("./routes/agents"));
 
-/* 404. */
+/**
+ * 404 и ошибки
+ */
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-/* Централизованный обработчик ошибок. */
 app.use((err, req, res, next) => {
   console.error("Error", err);
   res.status(err.status || 500).json({
