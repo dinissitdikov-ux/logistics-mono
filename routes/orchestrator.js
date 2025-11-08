@@ -7,6 +7,9 @@ const logger = require("../utils/logger");
 
 const router = express.Router();
 
+// JSON для всех маршрутов этого роутера
+router.use(express.json());
+
 /*
   ticket_status_t:
   new, collecting, waiting_docs, compliance, cost_ready,
@@ -29,7 +32,7 @@ function nextStatus(current, event, payload) {
   const fn = t[event];
   if (typeof fn === "function") return fn(payload);
   if (typeof fn === "string") return fn;
-  return null; // недопустимый переход
+  return null;
 }
 
 async function insertLog(table, data) {
@@ -40,35 +43,43 @@ async function insertLog(table, data) {
   return res.rows[0];
 }
 
+// Справка по роутеру (GET /api/orch)
+router.get("/", (req, res) => {
+  res.json({
+    base: "/api/orch",
+    endpoints: ["POST /emit", "GET /debug?ticket_id=:id"],
+    ts: new Date().toISOString(),
+  });
+});
+
 // POST /api/orch/emit
 router.post(
   "/emit",
   authenticateToken,
   authorizeRoles("admin", "service"),
-  express.json(),
   async (req, res) => {
     const trace_id = req.body.trace_id || randomUUID();
     const { event, ticket_id, payload = {} } = req.body;
     const actor = req.user?.email || "system";
 
-    if (!event)
+    if (!event) {
       return res.status(400).json({ trace_id, error: "event_required" });
+    }
 
     try {
       // 1) ticket
       let ticket;
       if (!ticket_id) {
         const r = await db.query(
-          "insert into tickets(status, created_at, updated_at) values('new', now(), now()) returning *",
+          "insert into tickets(status, created_at, updated_at) values('new', now(), now()) returning *"
         );
         ticket = r.rows[0];
       } else {
-        const r = await db.query("select * from tickets where id=$1", [
-          ticket_id,
-        ]);
+        const r = await db.query("select * from tickets where id=$1", [ticket_id]);
         ticket = r.rows[0];
-        if (!ticket)
+        if (!ticket) {
           return res.status(404).json({ trace_id, error: "ticket_not_found" });
+        }
       }
 
       // 2) messages
@@ -124,7 +135,7 @@ router.post(
       if (proposed !== current) {
         const r2 = await db.query(
           "update tickets set status=$1, updated_at=now() where id=$2 returning *",
-          [proposed, ticket.id],
+          [proposed, ticket.id]
         );
         status = r2.rows[0].status;
       }
@@ -208,7 +219,7 @@ router.post(
       });
       return res.status(500).json({ trace_id, error: e.message });
     }
-  },
+  }
 );
 
 // GET /api/orch/debug?ticket_id=ID
@@ -220,30 +231,32 @@ router.get(
     const trace_id = randomUUID();
     const id = req.query.ticket_id;
 
-    if (!id)
+    if (!id) {
       return res.status(400).json({ trace_id, error: "ticket_id_required" });
+    }
 
     try {
       const t = await db.query("select * from tickets where id=$1", [id]);
-      if (t.rows.length === 0)
+      if (t.rows.length === 0) {
         return res.status(404).json({ trace_id, error: "ticket_not_found" });
+      }
 
       const [msgs, audits, agents, tasks] = await Promise.all([
         db.query(
           "select role, detected_lang, text, extracted_fields, ts from messages where ticket_id=$1 order by ts asc limit 200",
-          [id],
+          [id]
         ),
         db.query(
           "select actor, action, entity, entity_id, before, after, ts from audit_log where entity=$1 and entity_id=$2 order by ts asc limit 200",
-          ["ticket", String(id)],
+          ["ticket", String(id)]
         ),
         db.query(
           "select agent_name, input, output, confidence, status, ts from agent_log where ticket_id=$1 order by ts asc limit 200",
-          [id],
+          [id]
         ),
         db.query(
           "select kind, status, assignee, due_at, payload, created_at, updated_at from tasks where ticket_id=$1 order by created_at asc limit 200",
-          [id],
+          [id]
         ),
       ]);
 
@@ -276,7 +289,7 @@ router.get(
       });
       return res.status(500).json({ trace_id, error: e.message });
     }
-  },
+  }
 );
 
 module.exports = router;
