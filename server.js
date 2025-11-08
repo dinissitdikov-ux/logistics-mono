@@ -1,21 +1,20 @@
+// server.js
 require("dotenv").config();
 const app = require("./app");
 
-/* Порт из окружения (Render установит PORT=3000), fallback 5000 для локалки. */
-const PORT = process.env.PORT || 5000;
+// Render передаёт порт через env.PORT
+const PORT = process.env.PORT || 3000;
 
-/* Баннер для логов. */
 const banner = () => `
 API base URL: http://0.0.0.0:${PORT}
 Available endpoints:
-GET  /            (this list)
+GET  /            (index)
 GET  /health
 GET  /api/health
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/profile
 GET  /api/orders
-GET  /api/index
 GET  /api/vehicles
 GET  /api/warehouses
 GET  /api/products
@@ -25,12 +24,11 @@ GET  /api/orch/debug?ticket_id=:id
 POST /api/agents/echo
 `;
 
-/* Старт HTTP. */
 const server = app.listen(PORT, "0.0.0.0", () => {
   console.log(banner());
 });
 
-/* Graceful shutdown. */
+// корректное завершение
 const shutdown = (signal) => {
   console.log(`\nReceived ${signal}, shutting down...`);
   server.close(() => {
