@@ -4,7 +4,26 @@ const helmet = require("helmet");
 
 const app = express();
 
-app.use(helmet());
+// Helmet + CSP: разрешаем fetch на Render и общие ресурсы
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "default-src": ["'self'"],
+        "connect-src": [
+          "'self'",
+          "https://logistics-mono-1.onrender.com"
+        ],
+        "script-src": ["'self'", "'unsafe-inline'", "https:"],
+        "style-src": ["'self'", "'unsafe-inline'", "https:"],
+        "img-src": ["'self'", "data:", "https:"],
+        "font-src": ["'self'", "https:"]
+      }
+    }
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -22,7 +41,13 @@ app.use(
       return callback(new Error("Blocked by CORS"));
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Origin",
+      "Accept"
+    ],
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 200
