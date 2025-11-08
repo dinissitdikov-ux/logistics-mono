@@ -21,19 +21,21 @@ app.use(
       if (allowlist.includes(origin)) return callback(null, true);
       return callback(new Error("Blocked by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
     credentials: true,
     preflightContinue: false,
     optionsSuccessStatus: 200
   })
 );
-
 app.options("*", cors());
 
 // health
 app.get("/health", (req, res) => {
-  res.json({ status: "healthy", ts: new Date().toISOString() });
+  res.status(200).json({ status: "healthy", ts: new Date().toISOString() });
+});
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ ok: true, ts: new Date().toISOString() });
 });
 
 // routes
