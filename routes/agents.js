@@ -1,18 +1,11 @@
-const express = require("express");
-const router = express.Router();
-const agents = require("../agents");
+// routes/agents.js
+const { Router } = require("express");
+const router = Router();
 
-router.get("/health", (req, res) => {
-  res.json({ ok: true, service: "agents", ts: Date.now() });
-});
-
-router.post("/echo", async (req, res) => {
-  try {
-    const result = await agents.echo(req.body);
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: "agent_error" });
-  }
+/* Простой эхо-эндпоинт для проверки CORS/JSON */
+router.post("/echo", (req, res) => {
+  const payload = req.body || {};
+  res.json({ ok: true, output: payload, confidence: 1 });
 });
 
 module.exports = router;
