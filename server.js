@@ -1,41 +1,59 @@
-// server.js
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
 require("dotenv").config();
-const app = require("./app");
 
+const app = express();
 const PORT = process.env.PORT || 5000;
 
-const banner = () => `
-API base URL: http://0.0.0.0:${PORT}
-Available endpoints:
-GET  /health
-GET  /api/health
-POST /api/auth/register
-POST /api/auth/login
-GET  /api/auth/profile
-GET  /api/orders
-GET  /api/vehicles
-GET  /api/warehouses
-GET  /api/products
-GET  /api/customers
-POST /api/orch/emit
-GET  /api/orch/debug?ticket_id=:id
-POST /api/agents/echo
-`;
+// middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(banner());
+// root info
+app.get("/", (req, res) => {
+  res.json({
+    message: "Logistics Backend API",
+    status: "running",
+    version: "1.0.0",
+    endpoints: {
+      health_root: "/health",
+      health_api: "/api/health",
+      i18n_settings: "/api/settings/i18n",
+    },
+  });
 });
 
-const shutdown = (signal) => {
-  console.log(`\nReceived ${signal}, shutting down...`);
-  server.close(() => {
-    console.log("HTTP server closed");
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10000).unref();
-};
+// health
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy", ts: new Date().toISOString() });
+});
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+// подключаем маршруты API (включая /api/settings/i18n)
+app.use("/api", require("./routes/index"));
+
+// доменные роуты при наличии (необязательно, оставлены как заглушки)
+// try { app.use('/api/auth', require('./routes/auth')); } catch {}
+// try { app.use('/api/orders', require('./routes/orders')); } catch {}
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
+
+// error handler
+app.use((err, req, res, next) => {
+  console.error("Error:", err);
+  res
+    .status(err.status || 500)
+    .json({ error: err.message || "Internal server error" });
+});
+
+// start
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`API running on port ${PORT}`);
+});
 
 module.exports = app;
