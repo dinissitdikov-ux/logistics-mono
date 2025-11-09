@@ -1,0 +1,7 @@
+-- I18n seed for settings (idempotent upsert)
+BEGIN;
+INSERT INTO settings(key, value) VALUES
+  ('allowed_doc_languages', jsonb_build_object('languages', ARRAY['nb-NO','en-GB'])),
+  ('ui_locales', jsonb_build_object('supported', ARRAY['nb-NO','en-GB','ru-RU'], 'default', 'nb-NO'))
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+COMMIT;
