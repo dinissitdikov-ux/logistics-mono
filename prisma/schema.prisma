@@ -7,15 +7,327 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            Int      @id @default(autoincrement())
-  email         String   @unique
-  passwordHash  String
-  createdAt     DateTime @default(now())
+enum direction_t {
+  LYR_TO_TOS
+  TOS_TO_LYR
 }
 
-model Setting {
+enum request_type_t {
+  pricing
+  order
+}
+
+enum ticket_status_t {
+  new
+  collecting
+  waiting_docs
+  compliance
+  cost_ready
+  confirmed
+  ready_to_dispatch
+  archived
+  blocked
+}
+
+enum transport_t {
+  air
+  sea
+  auto
+  undecided
+}
+
+enum payer_t {
+  sender
+  receiver
+  third_party
+}
+
+enum party_role_t {
+  sender
+  receiver
+  payer
+}
+
+enum doc_kind_t {
+  invoice
+  packing_list
+  permit
+  msds
+  other
+}
+
+enum doc_validation_t {
+  ok
+  needs_translation
+  rejected
+}
+
+enum msg_role_t {
+  user
+  assistant
+  operator
+  system
+}
+
+enum task_kind_t {
+  calc_air
+  clarify
+  ops
+  compliance_check
+  translate_doc
+}
+
+enum task_status_t {
+  new
+  in_progress
+  done
+  failed
+}
+
+model clients {
+  id               BigInt    @id @default(autoincrement())
+  external_id      String?   @unique
+  name             String
+  phone_e164       String?
+  email            String?
+  preferred_locale String?
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+
+  tickets tickets[]
+  @@map("clients")
+}
+
+model tickets {
+  id               BigInt         @id @default(autoincrement())
+  client_id        BigInt
+  direction        direction_t
+  request_type     request_type_t
+  status           ticket_status_t @default(new)
+  transport        transport_t     @default(undecided)
+  is_special       Boolean         @default(false)
+  payer            payer_t?
+  display_locale   String?
+  legal_hold       Boolean         @default(false)
+  legal_hold_reason String?
+  legal_hold_by    String?
+  legal_hold_at    DateTime?       @db.Timestamptz(6)
+  trace_id         String?
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime        @default(now()) @db.Timestamptz(6)
+
+  client    clients        @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  items     shipment_items[]
+  parties   parties[]
+  documents documents[]
+  messages  messages[]
+  tasks     tasks[]
+  notes     audit_log[]
+  notifs    notifications[]
+  agents    agent_log[]
+
+  @@index([client_id], map: "idx_tickets_client")
+  @@index([status], map: "idx_tickets_status")
+  @@map("tickets")
+}
+
+model shipment_items {
+  id         BigInt   @id @default(autoincrement())
+  ticket_id  BigInt
+  piece_no   Int
+  qty        Int
+  weight_kg  Decimal  @db.Decimal(8, 1)
+  length_cm  Int?
+  width_cm   Int?
+  height_cm  Int?
+  is_dg      Boolean  @default(false)
+  un_number  String?
+  notes      String?
+
+  ticket tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id], map: "idx_items_ticket")
+  @@map("shipment_items")
+}
+
+model parties {
+  id           BigInt       @id @default(autoincrement())
+  ticket_id    BigInt
+  role         party_role_t
+  contact_name String?
+  phone_e164   String?
+  email        String?
+
+  ticket   tickets   @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  addresses addresses[]
+
+  @@map("parties")
+}
+
+model addresses {
+  id       BigInt  @id @default(autoincrement())
+  party_id BigInt
+  street   String?
+  city     String?
+  postal   String?
+  country  String?
+  notes    String?
+
+  party parties @relation(fields: [party_id], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model documents {
+  id                BigInt          @id @default(autoincrement())
+  ticket_id         BigInt
+  kind              doc_kind_t
+  lang              String?
+  validation_status doc_validation_t?
+  file_uri          String
+  sha256            String?         @unique
+  parsed_json       Json?
+  issues            Json?
+  uploaded_by       msg_role_t?
+  created_at        DateTime        @default(now()) @db.Timestamptz(6)
+
+  ticket tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id], map: "idx_documents_ticket")
+  @@map("documents")
+}
+
+model messages {
+  id               BigInt   @id @default(autoincrement())
+  ticket_id        BigInt?
+  role             msg_role_t
+  detected_lang    String?
+  text             String?
+  attachments      Json?
+  extracted_fields Json?
+  ts               DateTime @default(now()) @db.Timestamptz(6)
+  trace_id         String?
+
+  ticket tickets? @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id], map: "idx_messages_ticket")
+  @@map("messages")
+}
+
+model tasks {
+  id         BigInt       @id @default(autoincrement())
+  ticket_id  BigInt?
+  kind       task_kind_t
+  status     task_status_t @default(new)
+  assignee   String?
+  due_at     DateTime?     @db.Timestamptz(6)
+  payload    Json?
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at DateTime      @default(now()) @db.Timestamptz(6)
+
+  ticket tickets? @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@index([ticket_id], map: "idx_tasks_ticket")
+  @@map("tasks")
+}
+
+model audit_log {
+  id       BigInt   @id @default(autoincrement())
+  actor    String?
+  action   String?
+  entity   String?
+  entity_id String?
+  before   Json?
+  after    Json?
+  ts       DateTime @default(now()) @db.Timestamptz(6)
+  trace_id String?
+  ticket_id BigInt?
+
+  ticket tickets? @relation(fields: [ticket_id], references: [id])
+
+  @@map("audit_log")
+}
+
+model notifications {
+  id        BigInt   @id @default(autoincrement())
+  ticket_id BigInt?
+  channel   String   @default("email")
+  recipient String?
+  subject   String?
+  body      String?
+  status    String?
+  error     String?
+  ts        DateTime @default(now()) @db.Timestamptz(6)
+  trace_id  String?
+
+  ticket tickets? @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model agent_log {
+  id         BigInt   @id @default(autoincrement())
+  agent_name String?
+  input      String?
+  output     String?
+  confidence Decimal? @db.Decimal(3, 2)
+  status     String?
+  ts         DateTime @default(now()) @db.Timestamptz(6)
+  trace_id   String?
+  ticket_id  BigInt?
+
+  ticket tickets? @relation(fields: [ticket_id], references: [id])
+
+  @@map("agent_log")
+}
+
+model access_log {
+  id         BigInt   @id @default(autoincrement())
+  user_id    String?
+  action     String?
+  ip_masked  String?
+  user_agent String?
+  ts         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("access_log")
+}
+
+model settings {
   key   String @id
   value Json
+
   @@map("settings")
+}
+
+model kb_docs {
+  id         BigInt   @id @default(autoincrement())
+  title      String?
+  locale     String?  @default("nb-NO")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  files  kb_files[]
+  chunks kb_chunks[]
+
+  @@map("kb_docs")
+}
+
+model kb_files {
+  id      BigInt  @id @default(autoincrement())
+  doc_id  BigInt
+  file_uri String?
+  sha256   String? @unique
+
+  doc kb_docs @relation(fields: [doc_id], references: [id], onDelete: Cascade)
+
+  @@map("kb_files")
+}
+
+model kb_chunks {
+  id       BigInt  @id @default(autoincrement())
+  doc_id   BigInt
+  chunk_no Int?
+  text     String?
+
+  doc kb_docs @relation(fields: [doc_id], references: [id], onDelete: Cascade)
+
+  @@map("kb_chunks")
 }
